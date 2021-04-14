@@ -8,6 +8,9 @@ subtitle: Due Apr 16 @ 11:59PM
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(tidyverse)
+library(faraway)
 ```
 
 ## Q1. Binomial Distribution
@@ -82,35 +85,121 @@ Var(Y_i)&=E_{\pi_i}(Var(Y_i|\pi_i))+Var_{\pi_i}(E(Y_i|\pi_i))\\
 A case-control study of esophageal cancer in Ileet-Vilaine, France. 
 ```{r}
 data(esoph)
+#help(esoph)
 ```
 
 ### a. Plot the proportion of cases against each predictor using the size of the point to indicate the number of subject as seen in Figure 2.7. Comment on the realtionships seen in the plots.
 
 Solution:
+```{r}
+plot_data <- esoph %>%
+  mutate(proportion=ncases/(ncontrols+ncases))
+
+ggplot(plot_data, aes(agegp, proportion))+
+  geom_point(aes(size = ncases),alpha = 7/10)+
+  ylab("Proportion of cases")+
+  xlab("Age group, years")+
+  theme_bw()
+
+ggplot(plot_data, aes(alcgp, proportion))+
+  geom_point(aes(size = ncases),alpha = 7/10)+
+  ylab("Proportion of cases")+
+  xlab("Alcohol consumption, gm/day")+
+  theme_bw()
+
+ggplot(plot_data, aes(tobgp, proportion))+
+  geom_point(aes(size = ncases),alpha = 7/10)+
+  ylab("Proportion of cases")+
+  xlab("Tobacco consumption, gm/day")+
+  theme_bw()
+```
 
 ### b. Fit a binomial GLM with interactions between all three predictors. Use AIC as a criterion to select a model using the `step` function. Which model is selected?
 
 Solution:
+```{r}
+lmod = glm(cbind(ncases, ncontrols)~agegp*alcgp*tobgp, 
+           family = binomial, data=esoph)
+summary(lmod)
+lmods = step(lmod, direction = "both")
+```
+
+Finally we selected `cbind(ncases, ncontrols) ~ agegp + alcgp + tobgp` as the best mopdel according to the AIC criteria. 
 
 ### c. All three factors are ordered and so special contrasts have been used appropriate for ordered factors involving linear, quadratic and cubic terms. Further simplification of the model may be possible by eliminating some of these terms. Use the `unclass` function to convert the factors to a numerical representation and check whether the model may be simplified.
 
 Solution:
+```{r}
+lmod = glm(cbind(ncases, ncontrols)~unclass(agegp)*unclass(alcgp)*unclass(tobgp), 
+           family = binomial, data=esoph)
+summary(lmod)
+lmods = step(lmod, direction = "both")
+drop1(lmods, test = c("Chisq"))
+```
+
+We selected `cbind(ncases, ncontrols) ~ unclass(agegp) + unclass(alcgp) + unclass(tobgp) + unclass(agegp):unclass(alcgp) + unclass(alcgp):unclass(tobgp)` as the best model. After drop1 test (chisq), we found that interaction of agegp and alcgp is not significant  within the 95% confidence interval. 
 
 ### d. Use the summary output of the factor model to suggest a model that is slightly more complex than the linear model proposed in the previous question.
 
 Solution:
+```{r}
+lmod = glm(cbind(ncases, ncontrols)~agegp*alcgp*tobgp, 
+           family = binomial, data=esoph)
+lmods = step(lmod, direction = "both")
+add1(lmods, lmod, test = c("F"))
+```
+According to the add1 test (F), we found that interaction of agegp and alcgp is significant within the 95% confidence interval and may be added in the model.
 
 ### e. Does your final model fit the data? Is the test you make accurate for this data?
 
 Solution:
+```{r}
+lmod = glm(cbind(ncases, ncontrols)~agegp*alcgp*tobgp, 
+           family = binomial, data=esoph)
+summary(lmod)
+lmods = step(lmod, direction = "both")
+
+# test the deviance
+pchisq(lmods$deviance, lmods$df.residual, lower = FALSE)
+
+df <- esoph %>%
+  mutate(proportion=ncases/(ncontrols+ncases)) %>%
+  mutate(weight=(ncontrols+ncases))
+predprob <- predict(lmods, type = "response")
+
+# Pearson chi-square statistic
+px2 <- sum((df$ncases - df$weight*predprob)^2 / 
+             (df$weight*predprob*(1 - predprob)))
+pchisq(px2, lmods$df.residual, lower.tail = FALSE)
+```
+
+We conducted pearson chi-squre test on the deviance D and Pearson chi-square statistic. The large p-value indicates that the model has an adequate fit.
 
 ### f. Check for outliers in your final model.
 
 Solution:
+```{r}
+df %>%
+  mutate(devres = residuals(lmods, type = "deviance"))%>%
+  mutate(linpred = predict(lmods, type = "link")) -> df
+halfnorm(hatvalues(lmods))
+halfnorm(cooks.distance(lmods))
+```
+According to the...
+
+```{r}
+df %>%
+  slice(c(13, 51, 67))
+```
+
 
 ### g. What is the predicted effect of moving one category higher in alcohol consumption?
 
 Solution:
+```{r}
+lmods %>% summary
+
+```
 
 ### h. Compute a 95\% confidence interval for this predicted effect.
 
