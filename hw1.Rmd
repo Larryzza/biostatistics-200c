@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(ggplot2)
 library(tidyverse)
 library(faraway)
+library(gtsummary)
 ```
 
 ## Q1. Binomial Distribution
@@ -96,19 +97,19 @@ plot_data <- esoph %>%
   mutate(proportion=ncases/(ncontrols+ncases))
 
 ggplot(plot_data, aes(agegp, proportion))+
-  geom_point(aes(size = ncases),alpha = 7/10)+
+  geom_point(aes(size = ncontrols+ncases),alpha = 7/10)+
   ylab("Proportion of cases")+
   xlab("Age group, years")+
   theme_bw()
 
 ggplot(plot_data, aes(alcgp, proportion))+
-  geom_point(aes(size = ncases),alpha = 7/10)+
+  geom_point(aes(size = ncontrols+ncases),alpha = 7/10)+
   ylab("Proportion of cases")+
   xlab("Alcohol consumption, gm/day")+
   theme_bw()
 
 ggplot(plot_data, aes(tobgp, proportion))+
-  geom_point(aes(size = ncases),alpha = 7/10)+
+  geom_point(aes(size = ncontrols+ncases),alpha = 7/10)+
   ylab("Proportion of cases")+
   xlab("Tobacco consumption, gm/day")+
   theme_bw()
@@ -117,79 +118,114 @@ ggplot(plot_data, aes(tobgp, proportion))+
 ### b. Fit a binomial GLM with interactions between all three predictors. Use AIC as a criterion to select a model using the `step` function. Which model is selected?
 
 Solution:
-```{r}
-lmod = glm(cbind(ncases, ncontrols)~agegp*alcgp*tobgp, 
+```{r, message = FALSE}
+lmod = glm(cbind(ncases, ncontrols) ~ agegp*alcgp*tobgp, 
            family = binomial, data=esoph)
-summary(lmod)
-lmods = step(lmod, direction = "both")
+minmod = glm(cbind(ncases, ncontrols) ~ 1, 
+           family = binomial, data=esoph)
+lmod_step = step(lmod, direction = "both")
+lmod_step = step(lmod, direction = "backward")
+lmod_step = step(minmod, direction = "forward", scope=~agegp*alcgp*tobgp)
+lmod_step %>%
+ tbl_regression(intercept = TRUE)
 ```
 
-Finally we selected `cbind(ncases, ncontrols) ~ agegp + alcgp + tobgp` as the best mopdel according to the AIC criteria. 
+We choose a model by AIC in three Stepwise Algorithms ("both", "backward", "forward"). All of results provides the same best model. Thus, we selected `cbind(ncases, ncontrols) ~ agegp + alcgp + tobgp` as the best model. 
 
 ### c. All three factors are ordered and so special contrasts have been used appropriate for ordered factors involving linear, quadratic and cubic terms. Further simplification of the model may be possible by eliminating some of these terms. Use the `unclass` function to convert the factors to a numerical representation and check whether the model may be simplified.
 
 Solution:
-```{r}
-lmod = glm(cbind(ncases, ncontrols)~unclass(agegp)*unclass(alcgp)*unclass(tobgp), 
-           family = binomial, data=esoph)
-summary(lmod)
-lmods = step(lmod, direction = "both")
-drop1(lmods, test = c("Chisq"))
+```{r, message = FALSE}
+lmod = glm(cbind(ncases, ncontrols) ~ unclass(agegp) + unclass(alcgp) 
+           + unclass(tobgp), family = binomial, data=esoph)
+lmod_unclass = step(lmod, direction = "both")
+lmod_unclass = step(lmod, direction = "backward")
+lmod_unclass = step(minmod, direction = "forward",
+             scope=~unclass(agegp)+unclass(alcgp)+unclass(tobgp))
+lmod_unclass %>%
+ tbl_regression(intercept = TRUE)
 ```
 
-We selected `cbind(ncases, ncontrols) ~ unclass(agegp) + unclass(alcgp) + unclass(tobgp) + unclass(agegp):unclass(alcgp) + unclass(alcgp):unclass(tobgp)` as the best model. After drop1 test (chisq), we found that interaction of agegp and alcgp is not significant  within the 95% confidence interval. 
+We choose a model by AIC in three Stepwise Algorithms ("both", "backward", "forward"). All of results provides the same best model. Thus, we selected `cbind(ncases, ncontrols) ~ unclass(agegp) + unclass(alcgp) + unclass(tobgp)` as the best model. 
 
 ### d. Use the summary output of the factor model to suggest a model that is slightly more complex than the linear model proposed in the previous question.
 
 Solution:
-```{r}
-lmod = glm(cbind(ncases, ncontrols)~agegp*alcgp*tobgp, 
+```{r, message = FALSE}
+#refer to original factor model
+lmod = glm(cbind(ncases, ncontrols) ~ agegp*alcgp*tobgp, 
            family = binomial, data=esoph)
-lmods = step(lmod, direction = "both")
-add1(lmods, lmod, test = c("F"))
+#final model
+lmod_final = glm(cbind(ncases, ncontrols) ~ unclass(alcgp) + 
+                   agegp + unclass(tobgp), family = binomial, data=esoph)
+lmod_final %>%
+ tbl_regression(intercept = TRUE)
 ```
-According to the add1 test (F), we found that interaction of agegp and alcgp is significant within the 95% confidence interval and may be added in the model.
+According to the summary output of the factor model, we found that quadratic term of age group is significant within the 95% confidence interval. In addition, tobgp and alcgp only have significant linear terms. Thus, we kept agegp as ordered categorical variable and unclassed alcgp and tobgp.
 
 ### e. Does your final model fit the data? Is the test you make accurate for this data?
 
 Solution:
 ```{r}
-lmod = glm(cbind(ncases, ncontrols)~agegp*alcgp*tobgp, 
-           family = binomial, data=esoph)
-summary(lmod)
-lmods = step(lmod, direction = "both")
-
 # test the deviance
-pchisq(lmods$deviance, lmods$df.residual, lower = FALSE)
+pchisq(lmod_final$deviance, lmod_final$df.residual, lower = FALSE)
 
 df <- esoph %>%
   mutate(proportion=ncases/(ncontrols+ncases)) %>%
   mutate(weight=(ncontrols+ncases))
-predprob <- predict(lmods, type = "response")
+predprob <- predict(lmod_final, type = "response")
 
 # Pearson chi-square statistic
 px2 <- sum((df$ncases - df$weight*predprob)^2 / 
              (df$weight*predprob*(1 - predprob)))
-pchisq(px2, lmods$df.residual, lower.tail = FALSE)
+pchisq(px2, lmod_final$df.residual, lower.tail = FALSE)
+
+# Hosmer-Lemeshow test statistic
+df_binned <- df %>%
+  mutate(predprob = predict(lmod_final, type = "response"),
+         linpred = predict(lmod_final, type = "link"),
+         bin = cut(linpred,
+                   breaks = unique(quantile(linpred, (1:100) / 101)))) %>%
+  group_by(bin) %>%
+  summarize(y = sum(ncases),
+            avgpred = mean(predprob),
+            count = sum(weight)) %>%
+  mutate(se_fit = sqrt(avgpred * (1 - avgpred) / count)) 
+df_binned %>%
+  ggplot(mapping = aes(x = avgpred, y = y / count)) +
+  geom_point() +
+  geom_linerange(mapping = aes(ymin = y / count - 2 * se_fit,
+                               ymax = y / count + 2 * se_fit), alpha = 0.5) +
+  geom_abline(intercept = 0, slope = 1) +
+  labs(x = "Predicted probability", y = "Observed proportion")
+
+# Hosmer-Lemeshow test
+hlstat <- with(df_binned, sum((y - count * avgpred)^2 / 
+                                (count * avgpred * (1 - avgpred))))
+# J
+nrow(df_binned)
+# p-value
+pchisq(hlstat, nrow(df_binned) - 1, lower.tail = FALSE)
 ```
 
-We conducted pearson chi-squre test on the deviance D and Pearson chi-square statistic. The large p-value indicates that the model has an adequate fit.
+We conducted pearson chi-squre test on the deviance D, Pearson chi-square statistic and Hosmer-Lemeshow test statistic. All of them present large p-value, indicating that the model has an adequate fit.
 
 ### f. Check for outliers in your final model.
 
 Solution:
 ```{r}
 df %>%
-  mutate(devres = residuals(lmods, type = "deviance"))%>%
-  mutate(linpred = predict(lmods, type = "link")) -> df
-halfnorm(hatvalues(lmods))
-halfnorm(cooks.distance(lmods))
+  mutate(devres = residuals(lmod_final, type = "deviance"))%>%
+  mutate(linpred = predict(lmod_final, type = "link")) -> df
+halfnorm(hatvalues(lmod_final))
+halfnorm(cooks.distance(lmod_final))
 ```
-According to the...
+According to the hatvalues and cooks.distance plots, we identified potential high influential observations (13, 67, 78). 
 
+Then we print out outliers and check:
 ```{r}
 df %>%
-  slice(c(13, 51, 67))
+  slice(c(13, 67, 78))
 ```
 
 
@@ -197,12 +233,23 @@ df %>%
 
 Solution:
 ```{r}
-lmods %>% summary
-
+coefs <- coef(lmod_final)
+odds = exp(coefs[2] * 1)
+round(as.numeric(odds),2)
 ```
+According to the results, we know that the risk of moving one category higher in alcohol consumption, the risk would be 92% higher.
+
 
 ### h. Compute a 95\% confidence interval for this predicted effect.
 
 Solution:
+```{r}
+confint(lmod_final)
+odds_lower = exp(0.4888562 * 1)
+odds_upper = exp(0.8205436 * 1)
+
+#95% confidence interval
+round(as.numeric(c(odds_upper, odds_lower)), 2)
+```
 
 
