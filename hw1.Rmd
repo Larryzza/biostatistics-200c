@@ -252,4 +252,4 @@ odds_upper = exp(0.8205436 * 1)
 round(as.numeric(c(odds_upper, odds_lower)), 2)
 ```
 
-
+The estimated 95% confidence interval for this effect of moving one category higher in alcohol consumption is (1.63, 2.27).
