@@ -1,0 +1,250 @@
+---
+title: "Biostat 200C Homework 4"
+subtitle: Due 11:59PM June 4th
+author: "Zian ZHUANG"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = FALSE)
+library(broom.mixed)
+library(tidyverse)
+library(pbkrtest)
+library(faraway)
+library(lme4)
+```
+
+## Q1. Balanced one-way ANOVA random effects model
+
+Consider the balanced one-way ANOVA random effects model with $a$ levels and $n$ observations in each level
+$$
+y_{ij} = \mu + \alpha_i + \epsilon_{ij}, \quad i=1,\ldots,a, \quad j=1,\ldots,n.
+$$
+where $\alpha_i$ are iid from $N(0,\sigma_\alpha^2)$, $\epsilon_{ij}$ are iid from $N(0, \sigma_\epsilon^2)$. 
+
+1. Derive the ANOVA estimate for $\mu$, $\sigma_\alpha^2$, and $\sigma_{\epsilon}^2$. Specifically show that
+\begin{eqnarray*}
+  \mathbb{E}(\bar y_{\cdot \cdot}) &=& \mathbb{E} \left( \frac{\sum_{ij} y_{ij}}{na} \right) = \mu \\
+  \mathbb{E} (\text{SSE}) &=& \mathbb{E} \left[ \sum_{i=1}^a \sum_{j=1}^n (y_{ij} - \bar{y}_{i \cdot})^2 \right] = a(n-1) \sigma_{\epsilon}^2 \\
+  \mathbb{E} (\text{SSA}) &=& \mathbb{E} \left[ \sum_{i=1}^a \sum_{j=1}^n (\bar{y}_{i \cdot} - \bar{y}_{\cdot \cdot})^2 \right] = (a-1)(n \sigma_{\alpha}^2 + \sigma_{\epsilon}^2),
+\end{eqnarray*}
+which can be solved to obtain ANOVA estimate
+\begin{eqnarray*}
+\widehat{\mu} &=& \frac{\sum_{ij} y_{ij}}{na}, \\
+\widehat{\sigma}_{\epsilon}^2 &=& \frac{\text{SSE}}{a(n-1)}, \\
+\widehat{\sigma}_{\alpha}^2 &=& \frac{\text{SSA}/(a-1) - \widehat{\sigma}_{\epsilon}^2}{n}.
+\end{eqnarray*}
+
+**Answer:**
+
+(1).
+
+$$\begin{aligned} 
+\mathbb{E}(\bar y_{\cdot \cdot}) &= \mathbb{E} \left( \frac{\sum_{ij} y_{ij}}{na} \right) \\
+&= \frac{1}{na}\mathbb{E} \left( \sum_{ij} y_{ij}\right) \\
+&= \frac{1}{na}\mathbb{E} \left( \sum_{ij} \mu + \alpha_i + \epsilon_{ij}\right) \\
+&= \frac{1}{na}(\mathbb{E} \left( \sum_{ij} \mu\right)+\mathbb{E} \left( \sum_{ij}  \alpha_i \right)+\mathbb{E} \left( \sum_{ij} \epsilon_{ij}\right)) \\
+&= \frac{1}{na}(\mathbb{E} \left( \sum_{ij} \mu\right)+0+0) \\
+&= \frac{1}{na}na\mu \\
+&= \mu 
+\end{aligned} $$
+
+(2).
+
+$$\begin{aligned} 
+\mathbb{E} (\text{SSE}) &= \mathbb{E} \left[ \sum_{i=1}^a \sum_{j=1}^n (y_{ij} - \bar{y}_{i \cdot})^2 \right]\\
+&= \mathbb{E} \left[ \sum_{i=1}^a \sum_{j=1}^n ((\mu + \alpha_i + \epsilon_{ij})-(\mu + \alpha_i + \bar{\epsilon}_{i\cdot}))^2 \right]\\
+&= \mathbb{E} \left[ \sum_{i=1}^a \sum_{j=1}^n (\epsilon_{ij}- \bar{\epsilon}_{i\cdot})^2 \right]\\
+&=   \sum_{i=1}^a (n-1) \sigma^2_\epsilon ,\quad \text{according to }E(x^2)=var(x)+E(x)^2\\
+&= a(n-1) \sigma_{\epsilon}^2
+\end{aligned} $$
+
+(3).
+
+$$\begin{aligned} 
+\mathbb{E} (\text{SSA}) &= \mathbb{E} \left[ \sum_{i=1}^a \sum_{j=1}^n (\bar{y}_{i \cdot} - \bar{y}_{\cdot \cdot})^2 \right]\\
+&= \mathbb{E} \left[ \sum_{i=1}^a \sum_{j=1}^n ((\mu + \alpha_i + \bar{\epsilon}_{i\cdot})-(\mu + \bar{\alpha_\cdot} + \bar{\epsilon}_{\cdot\cdot}))^2 \right]\\
+&= \mathbb{E} \left[ \sum_{i=1}^a \sum_{j=1}^n ((\mu + \alpha_i + \bar{\epsilon}_{i\cdot})-(\mu + \bar{\alpha_\cdot} + \bar{\epsilon}_{\cdot\cdot}))^2 \right]\\
+&= \mathbb{E} \left[ \sum_{i=1}^a \sum_{j=1}^n (\alpha_i + \bar{\epsilon}_{i\cdot}- \bar{\alpha_\cdot} - \bar{\epsilon}_{\cdot\cdot})^2 \right]\\
+&= \mathbb{E} \left[ \sum_{i=1}^a \sum_{j=1}^n ((\alpha_i - \bar{\alpha_\cdot}) + (\bar{\epsilon}_{i\cdot}- \bar{\epsilon}_{\cdot\cdot}))^2 \right]\\
+&= \mathbb{E} \left[ \sum_{i=1}^a \sum_{j=1}^n (\alpha_i - \bar{\alpha_\cdot})^2 + (\bar{\epsilon}_{i\cdot}- \bar{\epsilon}_{\cdot\cdot})^2+(\alpha_i - \bar{\alpha_\cdot})(\bar{\epsilon}_{i\cdot}- \bar{\epsilon}_{\cdot\cdot}) \right]\\
+&= \mathbb{E} \left[ \sum_{i=1}^a \sum_{j=1}^n (\alpha_i - \bar{\alpha_\cdot})^2 + (\bar{\epsilon}_{i\cdot}- \bar{\epsilon}_{\cdot\cdot})^2+0\right],\quad \text{given that }\alpha,\epsilon \text{ are independent}\\
+&= n\mathbb{E} \left[ \sum_{i=1}^a  (\alpha_i - \bar{\alpha_\cdot})^2 + (\bar{\epsilon}_{i\cdot}- \bar{\epsilon}_{\cdot\cdot})^2\right]\\
+&= n((a-1)\sigma_\alpha^2 + (a-1)\frac{\sigma_\epsilon^2}{n}),\quad \text{according to clt and }E(x^2)=var(x)+E(x)^2\\
+& = (a-1)(n \sigma_{\alpha}^2 + \sigma_{\epsilon}^2)
+\end{aligned} $$
+
+
+2. Calculate the three estimates for the `pulp` example in class, check if your results match with the R output.
+
+**Answer:**
+
+$$\begin{aligned} 
+\widehat{\mu} &= \frac{\sum_{ij} y_{ij}}{na}\\
+&= \frac{1208}{4*5}\\
+&= 60.4
+\end{aligned} $$
+
+$$\begin{aligned} 
+\widehat{\sigma}_{\epsilon}^2 &= \frac{\text{SSE}}{a(n-1)}\\
+&= \frac{1.70}{4(5-1)}\\
+&= 0.10625
+\end{aligned} $$
+
+$$\begin{aligned} 
+\widehat{\sigma}_{\alpha}^2 &= \frac{\text{SSA}/(a-1) - \widehat{\sigma}_{\epsilon}^2}{n}\\
+&= \frac{1.34/(4-1) - 0.10625}{5}\\
+&=0.06808
+\end{aligned} $$
+
+```{r}
+#check with r output
+data(pulp)
+mean(pulp$bright)
+(aovmod <- aov(bright ~ operator, data = pulp) %>% summary())
+#sigma_alpha
+(aovmod[1][[1]][[3]][1] - aovmod[1][[1]][[3]][2]) / 5
+#sigma_epsilon
+aovmod[1][[1]][[3]][2]
+```
+
+
+## Q2. Estimation of random effects
+
+1. Assume the conditional distribution
+$$
+\mathbf{y} \mid \boldsymbol{\gamma} \sim N(\mathbf{X} \boldsymbol{\beta} + \mathbf{Z} \boldsymbol{\gamma}, \sigma^2 \mathbf{I}_n)
+$$
+and the prior distribution
+$$
+\boldsymbol{\gamma} \sim N(\mathbf{0}_q, \boldsymbol{\Sigma}).
+$$
+Then by the Bayes theorem, the posterior distribution is
+\begin{eqnarray*}
+f(\boldsymbol{\gamma} \mid \mathbf{y}) &=& \frac{f(\mathbf{y} \mid \boldsymbol{\gamma}) \times f(\boldsymbol{\gamma})}{f(\mathbf{y})}, \end{eqnarray*}
+where $f$ denotes corresponding density. Show that the posterior distribution is a multivariate normal with mean
+$$
+\mathbb{E} (\boldsymbol{\gamma} \mid \mathbf{y}) = \boldsymbol{\Sigma} \mathbf{Z}^T (\mathbf{Z} \boldsymbol{\Sigma} \mathbf{Z}^T + \sigma^2 \mathbf{I})^{-1} (\mathbf{y} - \mathbf{X} \boldsymbol{\beta}).
+$$
+
+**Answer:**
+
+Given that,
+$$\begin{aligned} 
+y|\gamma \sim N(X\beta+Z\gamma, \sigma^2I_n)\\
+\gamma \sim N(0_q,\sum)
+\end{aligned} $$
+
+Then according to Bayes theorem, we can derive that,
+
+$$\begin{aligned} 
+f(\gamma|y)&\propto f(y,\gamma)=f(y|\gamma)f(\gamma)\\
+&\propto \exp(-\frac{1}{2\sigma^2}(y-x\beta-z\gamma)^T(y-x\beta-z\gamma))\exp(-\frac{1}{2}\gamma^T(\sum)^{-1}\gamma)\\
+&\propto \exp(-\frac{1}{2}(\frac{1}{\sigma^2}(\gamma^Tz^Tz\gamma-2\gamma^Tz^Ty+2\gamma^Tz^Tx\beta)+\gamma^T(\sum)^{-1}\gamma)\\
+&\propto \exp(-\frac{1}{2}(\gamma^T(\frac{1}{\sigma^2}z^Tz+(\sum)^{-1})\gamma-2\gamma^Tz^T(y-x\beta)))
+\end{aligned} $$
+
+Then we found that this is the normal density (kernal) function. since we know that  it follows that as a density must integrate to unity, then we know it follows normal density $\gamma|y\sim N(Mean_\gamma,Var_{\gamma})$,
+
+$$\begin{aligned} 
+Var_{\gamma}&=(\frac{1}{\sigma^2}z^Tz+(\sum)^{-1})^{-1}\\
+Mean_\gamma&= (\frac{1}{\sigma^2}z^Tz+(\sum)^{-1})^{-1}z^T(y-x\beta)\frac{1}{\sigma^2}
+\end{aligned} $$
+
+Since we have,
+$$\begin{aligned} 
+(E+FH^{-1}G)^{-1}FH^{-1}=E^{-1}F(H+GE^{-1}F)^{-1}
+\end{aligned} $$
+
+Then we can plug in when $E=(\sum)^{-1},F=z^T,G=z,H^{-1}=\frac{1}{\sigma}I$ and finally get,
+
+$$\begin{aligned} 
+Mean_\gamma=\sum z^T (\frac{1}{\sigma^2}z^Tz+(\sum)^{-1})^{-1}(y-x\beta)
+\end{aligned} $$
+
+2. (**Optional**) For the balanced one-way ANOVA random effects model, show that the posterior mean of random effects is always a constant (less than 1) multiplying the corresponding fixed effects estimate.
+
+## Q3. ELMR Exercise 11.1 (p251)
+
+The `ratdrink` data consist of 5 weekly measurements of body weight for 27 rats. The first 10 rats are on a control treatment while 7 rats have thyroxine added to their drinking water and 10 rats have thiouracil added to their water.
+
+```{r}
+#help("ratdrink")
+data(ratdrink)
+```
+
+1. Plot the data showing how weight increases with age on a single panel, taking care to distinguish the three treatment groups. Now create a three-panel plot, one for each group. Discuss what can be seen.
+
+```{r}
+# general means
+ratdrink %>%
+  group_by(weeks) %>%
+  summarise(mean=mean(wt)) %>%
+  ggplot(.) + geom_line(aes(x=weeks,y=mean)) + theme_bw()
+
+# details, grouped by treatments
+ggplot(ratdrink) + 
+  geom_line(aes(weeks, wt, group=subject, color=subject)) + 
+  facet_wrap(~treat, ncol = 3) +
+  theme_bw()
+```
+
+
+2. Fit a linear longitudinal model with a random slope and intercept for each rat. Each treatment group should have a different mean line. Give interpretation for the following estimates:
+
+ - The fixed effect intercept term.
+ 
+ - The interaction between thiouracil and week.
+ 
+ - The intercept random effect SD (standard deviation).
+ 
+```{r}
+smod <- lmer(wt ~ treat*weeks + (1 + weeks | subject), 
+             data = ratdrink, REML = TRUE)
+summary(smod)
+```
+ 
+ As we can tell from the results that:
+ 
+ - the average weight of a rat at week 0 is 52.88 among all treatment groups.
+ - for a rat in the thiouracil group, there will be an additional decrease in the average weight of -9.37 in a week.
+ - the average weight at week 0 has a standard deviation of 5.70 across all treatment groups 
+ 
+3. Check whether there is a significant treatment effect.
+
+```{r}
+smod2 <- lmer(wt ~ weeks + (1 + weeks | subject),
+              data = ratdrink, REML = TRUE)
+KRmodcomp(smod, smod2)
+```
+
+An approximate F-test based on the Kenward-Roger approach shows that the treatment has a significant effect (p<.001).
+
+4. Construct diagnostic plots showing the residuals against the fitted values and a QQ plot of the residuals. Comment on the plots.
+
+```{r}
+(diagd <- augment(smod))
+
+# QQ plot of the residuals
+diagd %>%
+  ggplot(mapping = aes(sample = .resid)) +
+  stat_qq() + theme_bw()
+
+# Residuals vs fitted value plots.
+diagd %>%
+  ggplot(mapping = aes(x = .fitted, y = .resid)) +
+  geom_point(alpha = 0.3) +
+  geom_hline(yintercept = 0) +
+  labs(x = "Fitted", ylab = "Residuals")
+```
+
+We can tell from the results that the residuals follows a normal distribution. Nevertheless, it may have some underlying non-linear trend that is not being revealed.
+
+5. Construct confidence intervals for the parameters of the model. Which random effect terms may not be significant? Is the thyroxine group significantly different from the control group?
+
+```{r}
+confint(smod, method = "boot")
+```
+
+As we can tell from the results that there is not a significant variance between the random intercept and the slope (95% CI .sig02 covers 0). Thyroxine group is not significantly different from the control group (`thyroxine:weeks` and `thyroxine` cover 0).
+
